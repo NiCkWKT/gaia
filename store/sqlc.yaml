@@ -1,0 +1,25 @@
+version: "2"
+sql:
+  - engine: mysql
+    schema: migrations
+    queries: queries.sql
+    gen:
+      go:
+        package: db
+        out: db
+        emit_interface: false
+        overrides:
+          - column: workflow_runs.outputs
+            go_type: database/sql.NullString
+          - column: workflow_runs.metrics
+            go_type: database/sql.NullString
+          - column: task_runs.inputs
+            go_type: database/sql.NullString
+          - column: task_runs.outputs
+            go_type: database/sql.NullString
+          - column: task_runs.metrics
+            go_type: database/sql.NullString
+          - column: workflow_runs.token
+            go_type: uint64
+          - column: task_runs.token
+            go_type: uint64
