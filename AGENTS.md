@@ -18,6 +18,10 @@ The overriding goal is simplicity: fewer, smaller files and fewer functions. Avo
 - Format Go code using `.golangci.yaml`: `golangci-lint fmt`
 - Run configured linters: `golangci-lint run`
 
+## Commits
+
+- Use Conventional Commits for commit messages (e.g., `fix: handle response write errors`).
+
 ## Comments
 
 - English only: comments, docstrings, log strings, CLI help. (User-facing translatable strings go through i18n — not this rule's concern.) If the repo is non-English, match it.
