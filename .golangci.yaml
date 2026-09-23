@@ -1,0 +1,36 @@
+## https://golangci-lint.run/usage/configuration/
+version: "2"
+run:
+  concurrency: 0
+  timeout: 5m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+    - ineffassign
+    - unconvert
+    - nolintlint
+    - bodyclose
+    - cyclop
+
+  settings:
+    cyclop:
+      max-complexity: 30
+      package-average: 10
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+
+issues:
+  max-issues-per-linter: 10
+  max-same-issues: 5
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports

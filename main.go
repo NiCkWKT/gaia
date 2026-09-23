@@ -62,7 +62,9 @@ func newRouter(logger *slog.Logger) http.Handler {
 	return r
 }
 
-func handleHello(w http.ResponseWriter, _ *http.Request) {
+func handleHello(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	_, _ = w.Write([]byte("Hello, World!"))
+	if _, err := w.Write([]byte("Hello, World!")); err != nil {
+		slog.ErrorContext(r.Context(), "write response", "err", err)
+	}
 }

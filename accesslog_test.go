@@ -20,7 +20,9 @@ func TestAccessLog(t *testing.T) {
 			t.Errorf("handler read body: %v", err)
 		}
 		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write(append([]byte("echo:"), body...))
+		if _, err := w.Write(append([]byte("echo:"), body...)); err != nil {
+			t.Errorf("handler write response: %v", err)
+		}
 	}))
 
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("ping"))

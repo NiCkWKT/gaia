@@ -14,7 +14,9 @@ The overriding goal is simplicity: fewer, smaller files and fewer functions. Avo
 
 ## Commands
 
-- Use `gofmt` for formatting Go code
+- Run tests: `go test ./...`
+- Format Go code using `.golangci.yaml`: `golangci-lint fmt`
+- Run configured linters: `golangci-lint run`
 
 ## Comments
 
