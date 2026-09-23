@@ -1,0 +1,4 @@
+github.com/NiCkWKT/aether v0.0.0-20260923033312-efc94c1fa82a h1:rArE3QMvWuPwqqJTXo/UWUP6G3evW7/zoesY/hPfSKo=
+github.com/NiCkWKT/aether v0.0.0-20260923033312-efc94c1fa82a/go.mod h1:LstYcvJO8+zNQEIu7uJ+sHFWyXeT5kj1aJCd7e64Im8=
+github.com/go-chi/chi/v5 v5.3.2 h1:5YQkICvTCSZ25hoRsyJazN0scjzKGiu4VAUc7H1o1nY=
+github.com/go-chi/chi/v5 v5.3.2/go.mod h1:R+tYY2hNuVUUjxoPtqUdgBqevM9s9njzkTLutVsOCto=
