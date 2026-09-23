@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+if ! command -v golangci-lint >/dev/null 2>&1; then
+    echo "pre-commit: golangci-lint is required; install it before committing" >&2
+    exit 1
+fi
+
+golangci-lint run
