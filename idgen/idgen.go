@@ -5,7 +5,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// Generator generates UUIDv4 identifiers for workflow and task runs.
 type Generator struct{}
 
 var _ aetheridgen.Generator = Generator{}
