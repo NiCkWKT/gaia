@@ -8,6 +8,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAccessLog(t *testing.T) {
@@ -16,13 +19,10 @@ func TestAccessLog(t *testing.T) {
 
 	h := accessLog(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			t.Errorf("handler read body: %v", err)
-		}
+		require.NoError(t, err, "handler read body")
 		w.WriteHeader(http.StatusCreated)
-		if _, err := w.Write(append([]byte("echo:"), body...)); err != nil {
-			t.Errorf("handler write response: %v", err)
-		}
+		_, err = w.Write(append([]byte("echo:"), body...))
+		require.NoError(t, err, "handler write response")
 	}))
 
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("ping"))
@@ -30,9 +30,7 @@ func TestAccessLog(t *testing.T) {
 
 	log := buf.String()
 	for _, want := range []string{`"body":"ping"`, `"body":"echo:ping"`, `"status":201`} {
-		if !strings.Contains(log, want) {
-			t.Errorf("log entry missing %s: %s", want, log)
-		}
+		assert.Contains(t, log, want)
 	}
 }
 
@@ -43,17 +41,12 @@ func TestAccessLogDefaultsStatusOK(t *testing.T) {
 	h := accessLog(logger)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
 
-	if !strings.Contains(buf.String(), `"status":200`) {
-		t.Errorf("expected default status 200: %s", buf.String())
-	}
+	assert.Contains(t, buf.String(), `"status":200`)
 }
 
 func TestLimitWriterTruncates(t *testing.T) {
 	w := &limitWriter{max: 4}
-	if _, err := w.Write([]byte("hello")); err != nil {
-		t.Fatalf("write: %v", err)
-	}
-	if got, want := w.String(), "hell…"; got != want {
-		t.Errorf("String() = %q, want %q", got, want)
-	}
+	_, err := w.Write([]byte("hello"))
+	require.NoError(t, err)
+	assert.Equal(t, "hell…", w.String())
 }

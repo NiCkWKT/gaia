@@ -15,6 +15,7 @@ The overriding goal is simplicity: fewer, smaller files and fewer functions. Avo
 ## Commands
 
 - Run tests: `go test ./...`
+- Use `github.com/stretchr/testify` assertions in all tests (`assert` for independent checks, `require` when a failure makes continuation invalid).
 - Format Go code using `.golangci.yaml`: `golangci-lint fmt`
 - Run configured linters: `golangci-lint run`
 
