@@ -15,3 +15,7 @@ _Avoid_: Engine, Executor
 **Executor**:
 A Worker-side implementation that performs a particular kind of task.
 _Avoid_: Worker, Engine
+
+**Task assignment**:
+The instruction for a Worker to execute a task, including the information it needs to perform that execution.
+_Avoid_: Task run
