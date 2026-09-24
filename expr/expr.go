@@ -3,11 +3,14 @@ package expr
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	aetherexpr "github.com/BabySid/aether/expr"
 	lang "github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/ast"
+	"github.com/expr-lang/expr/file"
+	"github.com/expr-lang/expr/parser/lexer"
 )
 
 // Evaluator evaluates Aether expressions without external services or shared state.
@@ -20,7 +23,11 @@ func (Evaluator) Eval(ctx context.Context, expression string, env map[string]any
 		return nil, err
 	}
 
-	program, err := lang.Compile(expression, lang.Env(env), lang.Patch(flatKeys{env: env}))
+	input, err := quoteHyphenatedKeys(expression, env)
+	if err != nil {
+		return nil, fmt.Errorf("lex expression: %w", err)
+	}
+	program, err := lang.Compile(input, lang.Env(env), lang.Patch(flatKeys{env: env}))
 	if err != nil {
 		return nil, fmt.Errorf("compile expression: %w", err)
 	}
@@ -32,6 +39,64 @@ func (Evaluator) Eval(ctx context.Context, expression string, env map[string]any
 		return nil, fmt.Errorf("evaluate expression: %w", err)
 	}
 	return result, nil
+}
+
+// quoteHyphenatedKeys protects exact flat keys before expr parses '-' as subtraction.
+func quoteHyphenatedKeys(expression string, env map[string]any) (string, error) {
+	tokens, err := lexer.Lex(file.NewSource(expression))
+	if err != nil {
+		return "", err
+	}
+	source := []rune(expression)
+	var result strings.Builder
+	last := 0
+	for _, token := range tokens {
+		if token.Kind != lexer.Identifier || token.From < last || token.From > 0 && source[token.From-1] == '.' {
+			continue
+		}
+		match := longestHyphenatedKey(source, token.From, env)
+		if match == "" {
+			continue
+		}
+		result.WriteString(string(source[last:token.From]))
+		parts := strings.Split(match, ".")
+		result.WriteString(parts[0])
+		for _, part := range parts[1:] {
+			if strings.Contains(part, "-") {
+				result.WriteByte('[')
+				result.WriteString(strconv.Quote(part))
+				result.WriteByte(']')
+			} else {
+				result.WriteByte('.')
+				result.WriteString(part)
+			}
+		}
+		last = token.From + len([]rune(match))
+	}
+	result.WriteString(string(source[last:]))
+	return result.String(), nil
+}
+
+func longestHyphenatedKey(source []rune, start int, env map[string]any) string {
+	var match string
+	for key := range env {
+		if !strings.Contains(key, "-") || len([]rune(key)) <= len([]rune(match)) {
+			continue
+		}
+		end := start + len([]rune(key))
+		if end > len(source) || string(source[start:end]) != key {
+			continue
+		}
+		if end < len(source) && (isNameRune(source[end]) || source[end] == '-') {
+			continue
+		}
+		match = key
+	}
+	return match
+}
+
+func isNameRune(r rune) bool {
+	return r == '_' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9'
 }
 
 type flatKeys struct {

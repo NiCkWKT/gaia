@@ -17,6 +17,16 @@ func TestEvaluator(t *testing.T) {
 		want       any
 		wantErr    bool
 	}{
+		{"hyphenated task output", "tasks.detect-os.outputs.parameters.os == 'darwin'", map[string]any{"tasks.detect-os.outputs.parameters.os": "darwin"}, true, false},
+		{"hyphenated key inside string remains a string", `"tasks.detect-os"`, map[string]any{"tasks.detect-os": "darwin"}, "tasks.detect-os", false},
+		{"hyphenated name after non-ASCII text", `"日本語" == "日本語" && tasks.detect-os.outputs.parameters.os == 'darwin'`, map[string]any{"tasks.detect-os.outputs.parameters.os": "darwin"}, true, false},
+		{"hyphen in string is not a key", `"tasks.detect-os.outputs.parameters.os"`, map[string]any{"tasks.detect-os.outputs.parameters.os": "darwin"}, "tasks.detect-os.outputs.parameters.os", false},
+		{"hyphenated task output with subtraction", "tasks.detect-os.outputs.parameters.count - 1", map[string]any{"tasks.detect-os.outputs.parameters.count": 3}, 2, false},
+		{"hyphenated task output navigates object", "tasks.detect-os.outputs.parameters.metadata.version", map[string]any{"tasks.detect-os.outputs.parameters.metadata": map[string]any{"version": "v1"}}, "v1", false},
+		{"hyphenated task with missing output", "tasks.detect-os.outputs.parameters.os", map[string]any{"tasks.other.phase": "Succeeded"}, nil, true},
+		{"subtraction remains subtraction", "tasks.detect - os", map[string]any{"tasks.detect": 8, "os": 3}, 5, false},
+		{"nested subtraction is not a flat key", "foo.tasks.detect - os", map[string]any{"foo": map[string]any{"tasks": map[string]any{"detect": 8}}, "tasks.detect-os": 99, "os": 3}, 5, false},
+		{"hyphenated flat key does not hijack nested path", "foo.tasks.detect-os", map[string]any{"foo": map[string]any{"tasks": map[string]any{"detect": 8}}, "tasks.detect-os": 99, "os": 3}, 5, false},
 		{"boolean condition", "tasks.fetch.phase != 'Succeeded'", map[string]any{"tasks.fetch.phase": "Failed"}, true, false},
 		{"flat nil value is present", "tasks.fetch.phase == nil", map[string]any{"tasks.fetch.phase": nil}, true, false},
 		{"flat key takes precedence", "tasks.fetch.phase", map[string]any{"tasks.fetch.phase": "Succeeded", "tasks": map[string]any{"fetch": map[string]any{"phase": "Failed"}}}, "Succeeded", false},
