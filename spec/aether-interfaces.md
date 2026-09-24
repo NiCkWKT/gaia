@@ -38,8 +38,8 @@ Gaia depends on the NiCkWKT fork at commit `efc94c1fa82ab03284a1b154294625193491
 
 6. **`expr.Evaluator`** — `github.com/BabySid/aether/expr`: evaluates expressions against an environment.
 7. **`secret.Provider`** — `github.com/BabySid/aether/secret`: retrieves secret values by name and key.
-8. **`hook.Notifier`** — `github.com/BabySid/aether/hook`: sends hook events.
-9. **`errsink.ErrorSink`** — `github.com/BabySid/aether/errsink`: observes internal errors for monitoring or alerting.
+8. **`hook.Notifier`** — `github.com/BabySid/aether/hook`: sends hook events. Gaia has a `notification.Telegram` adapter for one deployment-configured chat. Its constructor takes the bot token and chat ID directly; composition code chooses how to supply them (for example, via environment variables). It sends a standard message containing lifecycle type, workflow/task identity, run IDs, and the hook template **name** (not rendered template text). A send failure returns an error to Aether, which reports it to the ErrorSink as a warning.
+9. **`errsink.ErrorSink`** — `github.com/BabySid/aether/errsink`: observes internal errors for monitoring or alerting. The same Telegram adapter logs every internal error and queues only error/critical severities for best-effort Telegram delivery. Alerts use a bounded queue (64), a five-second HTTP timeout, and no retries. Drops and failures are logged; `Close(ctx)` attempts a bounded drain. Neither interface is wired to an Engine in the current Gaia server.
 10. **`vars.Source`** — `github.com/BabySid/aether/vars`: contributes variables to evaluation contexts.
 11. **`artifact.Repository`** — `github.com/BabySid/aether/artifact`: uploads and downloads artifacts. The selected commit marks the Engine integration as not yet wired into execution, so confirm the intended use before implementing.
 12. **`cron.Scheduler`** — `github.com/BabySid/aether/cron`: out of scope; Gaia will not implement a cron scheduler. `store.Store` still embeds `CronWorkflowStore`; Gaia's initial implementation will return an explicit unsupported-operation error from its cron methods.
