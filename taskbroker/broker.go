@@ -1,9 +1,4 @@
 // Package taskbroker provides an at-most-once Redis task queue for Aether.
-// FetchTask returns immediately when empty (unlike the pinned interface's
-// blocking comment), and Close does not drain remotely executing tasks.
-// There are no leases or redelivery: a Worker crash after fetch loses its task.
-// Redis availability also cannot recover a task if the Engine writes Ready to
-// its Store but crashes before dispatch; Engine.Start does not replay it.
 package taskbroker
 
 import (
@@ -40,8 +35,6 @@ type Broker struct {
 var _ broker.TaskBroker = (*Broker)(nil)
 
 // NewBroker constructs a broker using a caller-owned Redis client.
-// The handlers may reference an Engine initialized after construction, but must be
-// ready before the first report is made.
 func NewBroker(client *redis.Client, prefix string, onStart broker.StartHandler, onComplete broker.CompletionHandler) (*Broker, error) {
 	if client == nil || prefix == "" || onStart == nil || onComplete == nil {
 		return nil, fmt.Errorf("new broker: %w", ErrInvalidArgument)
@@ -49,17 +42,21 @@ func NewBroker(client *redis.Client, prefix string, onStart broker.StartHandler,
 	return &Broker{client: client, prefix: prefix, onStart: onStart, onComplete: onComplete}, nil
 }
 
-func (b *Broker) queue(executor string) string {
+func (b *Broker) queueKey(executor string) string {
 	return strconv.Itoa(len(b.prefix)) + ":" + b.prefix + ":tasks:" + executor
+}
+
+func (b *Broker) checkLocked(ctx context.Context) error {
+	if b.closed {
+		return ErrClosed
+	}
+	return ctx.Err()
 }
 
 func (b *Broker) Dispatch(ctx context.Context, assignment *wire.TaskAssignment) error {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	if b.closed {
-		return ErrClosed
-	}
-	if err := ctx.Err(); err != nil {
+	if err := b.checkLocked(ctx); err != nil {
 		return err
 	}
 	if assignment == nil || assignment.TaskRunID == "" || assignment.WorkflowRunID == "" || assignment.ExecutorType == "" {
@@ -69,28 +66,28 @@ func (b *Broker) Dispatch(ctx context.Context, assignment *wire.TaskAssignment) 
 	if err != nil {
 		return fmt.Errorf("encode assignment: %w", err)
 	}
-	if err := b.client.ZAdd(ctx, b.queue(assignment.ExecutorType), redis.Z{Score: float64(assignment.Priority), Member: string(payload)}).Err(); err != nil {
+	if err := b.client.ZAdd(ctx, b.queueKey(assignment.ExecutorType), redis.Z{Score: float64(assignment.Priority), Member: string(payload)}).Err(); err != nil {
 		return fmt.Errorf("dispatch assignment: %w", err)
 	}
 	return nil
 }
 
-// FetchTask returns immediately on an empty queue. A removed assignment has no
-// lease: a Worker crash after fetch can lose the task permanently.
+// FetchTask returns immediately on an empty queue rather than blocking.
 func (b *Broker) FetchTask(ctx context.Context, workerID string) (*wire.TaskAssignment, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	if b.closed {
-		return nil, ErrClosed
-	}
-	if err := ctx.Err(); err != nil {
+	if err := b.checkLocked(ctx); err != nil {
 		return nil, err
 	}
 	parts := strings.Split(workerID, "::")
-	if len(parts) != 3 || parts[0] != "v1" || parts[1] == "" || parts[2] == "" {
+	if len(parts) != 3 {
 		return nil, fmt.Errorf("fetch task: %w: worker ID", ErrInvalidArgument)
 	}
-	queue := b.queue(parts[2])
+	version, identifier, executorType := parts[0], parts[1], parts[2]
+	if version != "v1" || identifier == "" || executorType == "" {
+		return nil, fmt.Errorf("fetch task: %w: worker ID", ErrInvalidArgument)
+	}
+	queue := b.queueKey(executorType)
 	count, err := b.client.ZCard(ctx, queue).Result()
 	if err != nil {
 		return nil, fmt.Errorf("check task queue: %w", err)
@@ -122,26 +119,21 @@ func (b *Broker) FetchTask(ctx context.Context, workerID string) (*wire.TaskAssi
 
 func (b *Broker) StartTask(ctx context.Context, taskRunID, _ string) error {
 	b.mu.RLock()
-	closed := b.closed
+	err := b.checkLocked(ctx)
 	b.mu.RUnlock()
-	if closed {
-		return ErrClosed
-	}
-	if err := ctx.Err(); err != nil {
+	if err != nil {
 		return err
 	}
+	// Callbacks may close the broker, so do not hold the lock while invoking them.
 	b.onStart(ctx, taskRunID)
 	return nil
 }
 
 func (b *Broker) CompleteTask(ctx context.Context, result *wire.TaskResult) error {
 	b.mu.RLock()
-	closed := b.closed
+	err := b.checkLocked(ctx)
 	b.mu.RUnlock()
-	if closed {
-		return ErrClosed
-	}
-	if err := ctx.Err(); err != nil {
+	if err != nil {
 		return err
 	}
 	b.onComplete(ctx, result)
@@ -151,17 +143,13 @@ func (b *Broker) CompleteTask(ctx context.Context, result *wire.TaskResult) erro
 func (b *Broker) Cancel(ctx context.Context, _ string) error {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	if b.closed {
-		return ErrClosed
-	}
-	if err := ctx.Err(); err != nil {
+	if err := b.checkLocked(ctx); err != nil {
 		return err
 	}
 	return ErrNotImplemented
 }
 
-// Close stops new operations; queued assignments remain available to future
-// broker instances sharing the prefix. The caller closes the Redis client.
+// Close stops new operations without removing queued assignments or draining fetched work.
 func (b *Broker) Close() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()

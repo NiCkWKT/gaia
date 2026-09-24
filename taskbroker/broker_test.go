@@ -53,9 +53,13 @@ func redisClient(t *testing.T) *redis.Client {
 	return client
 }
 
+func noopStart(context.Context, string) {}
+
+func noopComplete(context.Context, *wire.TaskResult) {}
+
 func newBroker(t *testing.T, client *redis.Client) broker.TaskBroker {
 	t.Helper()
-	b, err := taskbroker.NewBroker(client, "gaia-test", func(context.Context, string) {}, func(context.Context, *wire.TaskResult) {})
+	b, err := taskbroker.NewBroker(client, "gaia-test", noopStart, noopComplete)
 	require.NoError(t, err)
 	t.Cleanup(func() { assert.NoError(t, b.Close()) })
 	return b
@@ -110,6 +114,25 @@ func TestValidationAndRetry(t *testing.T) {
 	}
 }
 
+func TestQueuedIdenticalDispatchCoalesces(t *testing.T) {
+	b := newBroker(t, redisClient(t))
+	ctx := t.Context()
+	a := assignment("retry", "echo", 1)
+	revised := assignment("retry", "echo", 2)
+	revised.RetryCount = 1
+	require.NoError(t, b.Dispatch(ctx, a))
+	require.NoError(t, b.Dispatch(ctx, a))
+	require.NoError(t, b.Dispatch(ctx, revised))
+	got, err := b.FetchTask(ctx, "v1::worker::echo")
+	require.NoError(t, err)
+	assert.Equal(t, revised, got)
+	got, err = b.FetchTask(ctx, "v1::worker::echo")
+	require.NoError(t, err)
+	assert.Equal(t, a, got)
+	_, err = b.FetchTask(ctx, "v1::worker::echo")
+	assert.ErrorIs(t, err, taskbroker.ErrNoTaskAvailable)
+}
+
 func TestConcurrentFetchAndIsolation(t *testing.T) {
 	client := redisClient(t)
 	first := newBroker(t, client)
@@ -149,7 +172,7 @@ func TestConcurrentFetchAndIsolation(t *testing.T) {
 			assert.ErrorIs(t, err, taskbroker.ErrNoTaskAvailable)
 		}
 	}
-	other, err := taskbroker.NewBroker(client, "other-deployment", func(context.Context, string) {}, func(context.Context, *wire.TaskResult) {})
+	other, err := taskbroker.NewBroker(client, "other-deployment", noopStart, noopComplete)
 	require.NoError(t, err)
 	t.Cleanup(func() { assert.NoError(t, other.Close()) })
 	require.NoError(t, first.Dispatch(t.Context(), a))
@@ -162,12 +185,10 @@ func TestConcurrentFetchAndIsolation(t *testing.T) {
 
 func TestPrefixesCannotAliasExecutorQueues(t *testing.T) {
 	client := redisClient(t)
-	start := func(context.Context, string) {}
-	complete := func(context.Context, *wire.TaskResult) {}
-	first, err := taskbroker.NewBroker(client, "alpha:tasks:beta", start, complete)
+	first, err := taskbroker.NewBroker(client, "alpha:tasks:beta", noopStart, noopComplete)
 	require.NoError(t, err)
 	t.Cleanup(func() { assert.NoError(t, first.Close()) })
-	second, err := taskbroker.NewBroker(client, "alpha", start, complete)
+	second, err := taskbroker.NewBroker(client, "alpha", noopStart, noopComplete)
 	require.NoError(t, err)
 	t.Cleanup(func() { assert.NoError(t, second.Close()) })
 	a := assignment("isolated", "gamma", 1)
@@ -181,18 +202,16 @@ func TestPrefixesCannotAliasExecutorQueues(t *testing.T) {
 
 func TestConstructorAndDurability(t *testing.T) {
 	client := redisClient(t)
-	start := func(context.Context, string) {}
-	complete := func(context.Context, *wire.TaskResult) {}
 	for _, tc := range []struct {
 		client *redis.Client
 		prefix string
 		start  func(context.Context, string)
 		done   func(context.Context, *wire.TaskResult)
 	}{
-		{nil, "prefix", start, complete},
-		{client, "", start, complete},
-		{client, "prefix", nil, complete},
-		{client, "prefix", start, nil},
+		{nil, "prefix", noopStart, noopComplete},
+		{client, "", noopStart, noopComplete},
+		{client, "prefix", nil, noopComplete},
+		{client, "prefix", noopStart, nil},
 	} {
 		_, err := taskbroker.NewBroker(tc.client, tc.prefix, tc.start, tc.done)
 		assert.ErrorIs(t, err, taskbroker.ErrInvalidArgument)
@@ -227,6 +246,7 @@ func TestCallbacksContextAndClose(t *testing.T) {
 	assert.ErrorIs(t, err, context.Canceled)
 	assert.ErrorIs(t, port.StartTask(ctx, "run", "v1::worker::echo"), context.Canceled)
 	assert.ErrorIs(t, port.CompleteTask(ctx, result), context.Canceled)
+	assert.ErrorIs(t, port.Cancel(ctx, "run"), context.Canceled)
 	assert.Len(t, starts, 1)
 	assert.Len(t, completions, 1)
 	require.NoError(t, port.Close())
