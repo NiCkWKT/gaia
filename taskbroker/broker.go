@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -48,7 +49,9 @@ func NewBroker(client *redis.Client, prefix string, onStart broker.StartHandler,
 	return &Broker{client: client, prefix: prefix, onStart: onStart, onComplete: onComplete}, nil
 }
 
-func (b *Broker) queue(executor string) string { return b.prefix + ":tasks:" + executor }
+func (b *Broker) queue(executor string) string {
+	return strconv.Itoa(len(b.prefix)) + ":" + b.prefix + ":tasks:" + executor
+}
 
 func (b *Broker) Dispatch(ctx context.Context, assignment *wire.TaskAssignment) error {
 	b.mu.RLock()

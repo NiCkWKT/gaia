@@ -119,6 +119,7 @@ func TestConcurrentFetchAndIsolation(t *testing.T) {
 	var wg sync.WaitGroup
 	results := make(chan *wire.TaskAssignment, 20)
 	errs := make(chan error, 20)
+	ctx := t.Context()
 	for i := range 20 {
 		wg.Add(1)
 		go func() {
@@ -127,7 +128,7 @@ func TestConcurrentFetchAndIsolation(t *testing.T) {
 			if i%2 == 0 {
 				b = second
 			}
-			got, err := b.FetchTask(context.Background(), fmt.Sprintf("v1::worker-%d::echo", i))
+			got, err := b.FetchTask(ctx, fmt.Sprintf("v1::worker-%d::echo", i))
 			results <- got
 			errs <- err
 		}()
@@ -155,6 +156,25 @@ func TestConcurrentFetchAndIsolation(t *testing.T) {
 	_, err = other.FetchTask(t.Context(), "v1::worker::echo")
 	assert.ErrorIs(t, err, taskbroker.ErrNoTaskAvailable)
 	got, err := second.FetchTask(t.Context(), "v1::worker::echo")
+	require.NoError(t, err)
+	assert.Equal(t, a, got)
+}
+
+func TestPrefixesCannotAliasExecutorQueues(t *testing.T) {
+	client := redisClient(t)
+	start := func(context.Context, string) {}
+	complete := func(context.Context, *wire.TaskResult) {}
+	first, err := taskbroker.NewBroker(client, "alpha:tasks:beta", start, complete)
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, first.Close()) })
+	second, err := taskbroker.NewBroker(client, "alpha", start, complete)
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, second.Close()) })
+	a := assignment("isolated", "gamma", 1)
+	require.NoError(t, first.Dispatch(t.Context(), a))
+	_, err = second.FetchTask(t.Context(), "v1::worker::beta:tasks:gamma")
+	assert.ErrorIs(t, err, taskbroker.ErrNoTaskAvailable)
+	got, err := first.FetchTask(t.Context(), "v1::worker::gamma")
 	require.NoError(t, err)
 	assert.Equal(t, a, got)
 }
@@ -217,7 +237,7 @@ func TestCallbacksContextAndClose(t *testing.T) {
 	assert.ErrorIs(t, port.StartTask(t.Context(), "run", "worker"), taskbroker.ErrClosed)
 	assert.ErrorIs(t, port.CompleteTask(t.Context(), result), taskbroker.ErrClosed)
 	assert.ErrorIs(t, port.Cancel(t.Context(), "run"), taskbroker.ErrClosed)
-	assert.NoError(t, client.Ping(t.Context()).Err()) // caller retains ownership of the Redis client
+	assert.NoError(t, client.Ping(t.Context()).Err())
 }
 
 func TestRedisFailureIsNotEmpty(t *testing.T) {
