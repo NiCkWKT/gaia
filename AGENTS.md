@@ -20,9 +20,10 @@ The overriding goal is simplicity: fewer, smaller files and fewer functions. Avo
 - Run configured linters: `golangci-lint run`
 - Enable the versioned pre-commit lint gate in each clone: `git config --local core.hooksPath .githooks` (requires `golangci-lint` on `PATH`).
 
-## Commits
+## Commits and merges
 
 - Use Conventional Commits for commit messages (e.g., `fix: handle response write errors`).
+- When merging a PR into `main`, prefer a fast-forward merge to keep history linear. If `main` has advanced, rebase the feature branch and verify it before merging. Confirm the merge does not introduce a merge commit. Preserve any existing merge commit unless the owner explicitly approves rewriting published history.
 
 ## Comments
 
