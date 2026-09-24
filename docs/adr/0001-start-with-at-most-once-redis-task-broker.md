@@ -1,0 +1,3 @@
+# Start with an at-most-once Redis task broker
+
+Gaia's first distributed broker uses executor-specific Redis sorted sets to prioritize serialized task assignments, returning an immediate no-task error on an empty queue and removing each assignment on fetch. We chose a simple happy path over leases, redelivery, blocking fetch, and atomic multi-command claims; a Worker crash after fetch can lose a task, and recovery across the Engine Store and Redis remains separate work. `Cancel` is unsupported and `Close` does not yet drain fetched work. These are intentional initial limitations, not delivery guarantees for production recovery.
