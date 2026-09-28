@@ -211,6 +211,31 @@ func TestWorkflowHTTPHappyPath(t *testing.T) {
 	task, ok := tasks[0].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "Succeeded", task["status"])
+	for _, tc := range []struct {
+		name, result, phase string
+	}{
+		{"business-failure", `"code":2,"message":"rejected"`, "Failed"},
+		{"suspended", `"code":1,"message":"waiting"`, "Suspended"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := fmt.Sprintf(`{"apiVersion":"aether/v1","kind":"Workflow","metadata":{"name":%q},"spec":{"entrypoint":"greet","templates":[{"task":{"name":"greet","executor":{"type":"echo"}}}]}}`, tc.name)
+			submitted := assertReply(t, request("POST", "/workflow", body), 0, "succ")
+			id, ok := submitted["workflowRunID"].(string)
+			require.True(t, ok)
+			assignment := assertReply(t, request("POST", "/task/fetch", `{"workerID":"v1::worker::echo"}`), 0, "succ")
+			taskID, ok := assignment["taskRunID"].(string)
+			require.True(t, ok)
+			assertReply(t, request("POST", "/task/start", fmt.Sprintf(`{"workerID":"v1::worker::echo","taskRunID":%q}`, taskID)), 0, "succ")
+			assertReply(t, request("POST", "/task/complete", fmt.Sprintf(`{"taskRunID":%q,"workflowRunID":%q,%s}`, taskID, id, tc.result)), 0, "succ")
+			execution := assertReply(t, request("GET", "/workflow?workflow_run_id="+id, ""), 0, "succ")
+			tasks, ok := execution["tasks"].([]any)
+			require.True(t, ok)
+			require.NotEmpty(t, tasks)
+			task, ok := tasks[0].(map[string]any)
+			require.True(t, ok)
+			assert.Equal(t, tc.phase, task["status"])
+		})
+	}
 	assert.NoError(t, app.redis.Close())
 	assertReply(t, request("POST", "/task/fetch", `{"workerID":"v1::worker::echo"}`), 2001, "dependency unavailable")
 }
