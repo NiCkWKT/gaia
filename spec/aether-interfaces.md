@@ -4,7 +4,7 @@ This document tracks the Aether interfaces Gaia may implement. Implement them in
 
 ## Dependency
 
-Gaia depends on the NiCkWKT fork at commit `efc94c1fa82ab03284a1b1542946251934910e1d` (the `dev` branch commit). The fork declares its module path as `github.com/BabySid/aether`, so imports use that path and `go.mod` replaces it with `github.com/NiCkWKT/aether`.
+Gaia depends on the NiCkWKT fork at commit `a23faa85122a3a197e1e64d3769dcebdd22c3ff9` (the `dev` branch commit). The fork declares its module path as `github.com/BabySid/aether`, so imports use that path and `go.mod` replaces it with `github.com/NiCkWKT/aether`.
 
 ## Interfaces to consider
 

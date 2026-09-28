@@ -24,4 +24,4 @@ require (
 )
 
 // The NiCkWKT fork still declares its module path as github.com/BabySid/aether.
-replace github.com/BabySid/aether => github.com/NiCkWKT/aether v0.0.0-20260923033312-efc94c1fa82a
+replace github.com/BabySid/aether => github.com/NiCkWKT/aether v0.0.0-20260928030500-a23faa85122a
