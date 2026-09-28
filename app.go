@@ -66,8 +66,10 @@ func newApp(ctx context.Context, logger *slog.Logger) (_ *app, err error) {
 	if err = a.redis.Ping(ctx).Err(); err != nil {
 		return nil, fmt.Errorf("ping Redis: %w", err)
 	}
-	if _, err = db.ExecContext(ctx, "SELECT run_id FROM workflow_runs LIMIT 0"); err != nil {
-		return nil, fmt.Errorf("verify Store schema (apply migrations before startup): %w", err)
+	for _, table := range []string{"workflow_runs", "task_runs", "executor_schemas"} {
+		if _, err = db.ExecContext(ctx, "SELECT 1 FROM "+table+" LIMIT 0"); err != nil {
+			return nil, fmt.Errorf("verify Store schema (apply migrations before startup): %w", err)
+		}
 	}
 	a.telegram, err = notification.NewTelegram(token, chatID, logger)
 	if err != nil {
