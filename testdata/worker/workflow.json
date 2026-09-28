@@ -1,0 +1,54 @@
+{
+  "apiVersion": "aether/v1",
+  "kind": "Workflow",
+  "metadata": {"name": "mock-prompt-to-image"},
+  "spec": {
+    "entrypoint": "pipeline",
+    "templates": [
+      {
+        "dag": {
+          "name": "pipeline",
+          "tasks": [
+            {"name": "describe", "template": "describe-prompt"},
+            {
+              "name": "render",
+              "template": "render-image",
+              "dependencies": ["describe"],
+              "arguments": {
+                "parameters": [
+                  {"name": "prompt", "valueFrom": {"parameter": "tasks.describe.outputs.parameters.text"}}
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "task": {
+          "name": "describe-prompt",
+          "executor": {"type": "prompt"},
+          "inputs": {
+            "parameters": [
+              {"name": "prompt", "type": "string", "value": "a cat reading a book"},
+              {"name": "images", "type": "array", "value": []}
+            ]
+          },
+          "outputs": {"parameters": [{"name": "text", "type": "string"}]}
+        }
+      },
+      {
+        "task": {
+          "name": "render-image",
+          "executor": {"type": "image"},
+          "inputs": {
+            "parameters": [
+              {"name": "prompt", "type": "string"},
+              {"name": "images", "type": "array", "value": []}
+            ]
+          },
+          "outputs": {"parameters": [{"name": "uri", "type": "string"}]}
+        }
+      }
+    ]
+  }
+}
