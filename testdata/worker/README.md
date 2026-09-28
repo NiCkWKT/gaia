@@ -3,9 +3,15 @@
 A standalone example Worker for Gaia. It hosts two Aether Executors in one process: `image` and `prompt`. Each executor type has `WORKER_CONCURRENCY` independent polling goroutines; each goroutine fetches once per second. No Worker registration, heartbeat, fetch lease, or redelivery is provided.
 
 ```sh
+make start-worker   # from the repository root, with Gaia already running
+```
+
+Or run it directly in this directory:
+
+```sh
 cd testdata/worker
 go run .
-# In this directory, run the module's tests separately from root go test ./...:
+# Run this module's tests separately from root `go test ./...`:
 go test ./...
 ```
 

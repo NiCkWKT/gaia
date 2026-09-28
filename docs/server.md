@@ -13,3 +13,14 @@ Before starting Gaia, create a MySQL 8.4 database and apply the SQL migrations i
 Gaia pings MySQL and Redis and checks the Store schema before listening; a missing setting or unavailable dependency prevents startup. Migrations, listener reachability, and any transport protection are deployment responsibilities. A successful task-start or task-complete HTTP response confirms callback invocation, not durable acceptance; an empty fetch is a success with `data: {}`.
 
 Local services for development: `make setup`; isolated Store and broker integration tests: `make test`. HTTP integration tests launch isolated MySQL and Redis containers when Docker is available.
+
+## Local run
+
+Run each command in its own terminal; both block until interrupted.
+
+```sh
+make start-gaia    # starts MySQL and Redis, applies migrations, then serves on 127.0.0.1:8080
+make start-worker  # mock Worker polling the local Gaia
+```
+
+`start-gaia` applies `store/migrations/` only when the three Store tables are absent, so it is safe to re-run. It defaults to the local `gaia_test` database, which `make test` drops and recreates: do not keep data you care about there. Override `GAIA_MYSQL_DSN`, `GAIA_REDIS_ADDR`, `GAIA_REDIS_PREFIX`, or `GAIA_PORT` for another target. It reads `GAIA_TELEGRAM_BOT_TOKEN` and `GAIA_TELEGRAM_CHAT_ID` from the environment; Gaia refuses to start when either is empty. `start-worker` sets `GAIA_URL`, `WORKER_ID`, and `WORKER_CONCURRENCY` for `testdata/worker`; see `testdata/worker/README.md`.

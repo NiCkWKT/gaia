@@ -8,6 +8,12 @@
       {
         "dag": {
           "name": "pipeline",
+          "outputs": {
+            "parameters": [
+              {"name": "text", "type": "string", "valueFrom": {"parameter": "tasks.describe.outputs.parameters.text"}},
+              {"name": "uri", "type": "string", "valueFrom": {"parameter": "tasks.render.outputs.parameters.uri"}}
+            ]
+          },
           "tasks": [
             {"name": "describe", "template": "describe-prompt"},
             {
